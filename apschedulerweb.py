@@ -1,3 +1,6 @@
+import signal
+import sys
+
 from apscheduler.scheduler import Scheduler
 from apscheduler.events import EVENT_JOB_ERROR
 import bottle
@@ -15,6 +18,11 @@ web_config = {
     'max_auth_tries': 3, # maximum number of tries before user will be banned
     'max_log_entries': 10 # maximum number of entries saved in log for each job
 }
+
+def kill_handler(signum, frame):
+    if 'sched' in webapp and webapp['sched'].running:
+        webapp['sched'].shutdown()
+        sys.exit(0) # stopping server
 
 def parse_config(config, default):
     if config is None:
@@ -58,8 +66,9 @@ def start(sched, bottle_conf=None, **web_conf):
     if webapp['users'] is not None:
         bottle.install(BasicAuthPlugin(webapp['users'],
                        max_auth_tries=webapp['max_auth_tries']))
-    bottle.debug()
+    signal.signal(signal.SIGTERM, kill_handler)
     bottle.run(**bottle_conf)
+    sched.shutdown()
 
 @bottle.route('/')
 def list_jobs():
