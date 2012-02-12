@@ -2,6 +2,7 @@ import signal
 import sys
 import os
 import grp
+import ConfigParser
 
 from apscheduler.scheduler import Scheduler
 from apscheduler.events import EVENT_JOB_ERROR
@@ -51,13 +52,26 @@ def error_listener(event):
         del log[0]
     log.append(event)
 
-def start(sched, bottle_conf=None, **web_conf):
+def start(sched, conf_file=None, bottle_conf=None, **web_conf):
     '''Start scheduler and its web interface.
     :param sched: a Scheduler object.
     :param bottle_conf: dict with configuration passed to bottle.run
     :param **web_conf: params passed to web application
     '''
     global webapp
+    if conf_file is not None:
+        cfgparser = ConfigParser.ConfigParser()
+        cfgparser.read(conf_file)
+        if cfgparser.has_section('bottle'):
+            bottle_conf = {}
+            bottle_conf.update(cfgparser.items('bottle'))
+        if cfgparser.has_section('web'):
+            web_conf = {}
+            web_conf.update(cfgparser.items('web'))
+            if 'users' in web_conf:
+                users = [up.split(':') for up in web_conf['users'].split(',')]
+                web_conf['users'] = {}
+                web_conf['users'].update(users)
     bottle_conf = parse_config(bottle_conf, bottle_config)
     webapp = parse_config(web_conf, web_config)
     webapp['sched'] = sched
