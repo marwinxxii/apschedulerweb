@@ -8,6 +8,7 @@ setup(name='apschedulerweb',
       version='0.1',
       author='Alexey Agapitov',
       author_email='marwinxxii@gmail.com',
+      url='https://github.com/marwinxxii/apschedulerweb',
       py_modules=['apschedulerweb'],
       requires=['bottle (>=0.9)', 'apscheduler', 'bottle_basicauth (>=0.1)'],
       cmd_class={'build_py': build_py}

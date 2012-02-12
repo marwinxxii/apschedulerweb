@@ -1,5 +1,7 @@
 import signal
 import sys
+import os
+import grp
 
 from apscheduler.scheduler import Scheduler
 from apscheduler.events import EVENT_JOB_ERROR
@@ -7,22 +9,25 @@ import bottle
 
 from bottle.ext.basicauth import BasicAuthPlugin
 
-webapp = {
-    }
+webapp = None
 bottle_config = {
     'host': 'localhost',
     'port': 8080
 }
 web_config = {
     'users': None, # dict with usernames as keys and passwords as values
-    'max_auth_tries': 3, # maximum number of tries before user will be banned
-    'max_log_entries': 10 # maximum number of entries saved in log for each job
+    'max_auth_tries': 3, # max number of tries before user will be banned
+    'max_log_entries': 10, # max number of entries saved in log for each job
+    'pid_file': 'apschedulerweb.pid'
 }
 
+def on_exit():
+    webapp['sched'].shutdown()
+    os.remove(webapp['pid_file'])
+
 def kill_handler(signum, frame):
-    if 'sched' in webapp and webapp['sched'].running:
-        webapp['sched'].shutdown()
-        sys.exit(0) # stopping server
+    on_exit()
+    sys.exit(0) # stopping server
 
 def parse_config(config, default):
     if config is None:
@@ -66,9 +71,16 @@ def start(sched, bottle_conf=None, **web_conf):
     if webapp['users'] is not None:
         bottle.install(BasicAuthPlugin(webapp['users'],
                        max_auth_tries=webapp['max_auth_tries']))
+    if 'user' in web_conf:
+        gid = grp.getgrnam(web_conf['user']).gr_gid
+        os.setreuid(gid, gid)
+    if os.path.exists(webapp['pid_file']):
+        print('Warning! PID file already exists')
+    with open(webapp['pid_file'], 'w') as f:
+        f.write(str(os.getpid()))
     signal.signal(signal.SIGTERM, kill_handler)
     bottle.run(**bottle_conf)
-    sched.shutdown()
+    on_exit()
 
 @bottle.route('/')
 def list_jobs():
