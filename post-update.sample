@@ -1,0 +1,33 @@
+#!/bin/sh
+repo=pycronweb
+SRC_PATH=/home/alex/src
+REPO_PATH=/home/alex/repos
+APP_PATH='/home/alex/apps'
+pid_file='pycronweb.pid'
+config_file=config.json
+
+if [ ! -e "$SRC_PATH/$repo" ]
+then
+    echo 'Creating repo'
+    mkdir "$SRC_PATH/$repo"
+fi
+
+GIT_WORK_TREE="$SRC_PATH/$repo" git checkout -f
+cd "$SRC_PATH/$repo"
+
+source "$APP_PATH/main_env/bin/activate"
+echo 'Installing apschedulerweb'
+python setup.py install
+echo 'Installing bottle-basicauth'
+cd bottle_basicauth
+python setup.py install
+
+cd "$APP_PATH/$repo"
+if [ -e $pid_file ]
+then
+    echo 'Stopping running instance of pycronweb'
+    pid=$(cat $pid_file)
+    kill $pid
+fi
+echo 'Starting new instance of pycronweb'
+python -m apschedulerweb --conf=$config_file&
