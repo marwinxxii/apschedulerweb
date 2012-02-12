@@ -2,9 +2,8 @@ import signal
 import sys
 import os
 import grp
-import ConfigParser
+import json
 
-from apscheduler.scheduler import Scheduler
 from apscheduler.events import EVENT_JOB_ERROR
 import bottle
 
@@ -30,7 +29,7 @@ def kill_handler(signum, frame):
     on_exit()
     sys.exit(0) # stopping server
 
-def parse_config(config, default):
+def fill_defaults(config, default):
     if config is None:
         config = dict(default)
     else:
@@ -55,25 +54,18 @@ def error_listener(event):
 def start(sched, conf_file=None, bottle_conf=None, **web_conf):
     '''Start scheduler and its web interface.
     :param sched: a Scheduler object.
+    :param conf_file: path to file with config in JSON format
     :param bottle_conf: dict with configuration passed to bottle.run
     :param **web_conf: params passed to web application
     '''
-    global webapp
     if conf_file is not None:
-        cfgparser = ConfigParser.ConfigParser()
-        cfgparser.read(conf_file)
-        if cfgparser.has_section('bottle'):
-            bottle_conf = {}
-            bottle_conf.update(cfgparser.items('bottle'))
-        if cfgparser.has_section('web'):
-            web_conf = {}
-            web_conf.update(cfgparser.items('web'))
-            if 'users' in web_conf:
-                users = [up.split(':') for up in web_conf['users'].split(',')]
-                web_conf['users'] = {}
-                web_conf['users'].update(users)
-    bottle_conf = parse_config(bottle_conf, bottle_config)
-    webapp = parse_config(web_conf, web_config)
+        with open(conf_file, 'r') as f:
+            conf = json.load(f)
+        bottle_conf = conf.get('bottle', bottle_conf)
+        web_conf = conf.get('web', web_conf)
+    bottle_conf = fill_defaults(bottle_conf, bottle_config)
+    global webapp
+    webapp = fill_defaults(web_conf, web_config)
     webapp['sched'] = sched
     for job, jobstore in sched._pending_jobs:
         job.fails = 0
@@ -149,3 +141,36 @@ def show_error(error):
 @bottle.route('/static/<filename:path>', skip='basicauth')
 def static(filename):
     return bottle.static_file(filename, root='static')
+
+if __name__ == '__main__':
+    import argparse
+    import imp
+    from apscheduler.scheduler import Scheduler
+    
+    usage = 'python -m apschedulerweb --conf=file'
+    parser = argparse.ArgumentParser(usage=usage)
+    parser.add_argument('--conf', required=True)
+    args = parser.parse_args()
+    with open(args.conf, 'r') as f:
+        conf = json.load(f)
+    if 'jobs' not in conf or len(conf['jobs']) == 0:
+        print('List of jobs should be defined')
+        sys.exit(1)
+    s = Scheduler()
+    for job in conf['jobs']:
+        fil = job.pop('file')
+        name = os.path.basename(fil)[:-3]
+        module = imp.load_source(name, fil)
+        job['func'] = getattr(module, job['func'])
+        job_trigger = job.pop('trigger')
+        if job_trigger == 'interval':
+            s.add_interval_job(**job)
+        elif job_trigger == 'date':
+            s.add_date_job(**job)
+        elif job_trigger == 'cron':
+            s.add_cron_job(**job)
+        else:
+            raise ValueError('Unknown job type')
+    web_conf = conf.get('web', {})
+    bottle_conf = conf.get('bottle', None)
+    start(s, bottle_conf=bottle_conf, **web_conf)
