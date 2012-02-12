@@ -2,7 +2,34 @@
 <html>
 <head>
 <meta charset=utf-8>
-<link rel=stylesheet href="/static/main.css">
+<style type=text/css>
+  #header
+  {
+    width: 25%;
+    float: left;
+    margin-bottom: 0;
+  }
+
+  #menu
+  {
+    vertical-align: bottom;
+    list-style-type: none;
+    float: left;
+    margin: 0;
+    padding: 0;
+  }
+
+  #menu li
+  {
+    float: left;
+    margin: 0 10px 0 0;
+  }
+
+  .clear_both
+  {
+    clear: both;
+  }
+</style>
 <title>{{title}}</title>
 </head>
 <body>

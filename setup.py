@@ -11,5 +11,8 @@ setup(name='apschedulerweb',
       url='https://github.com/marwinxxii/apschedulerweb',
       py_modules=['apschedulerweb'],
       requires=['bottle (>=0.9)', 'apscheduler', 'bottle_basicauth (>=0.1)'],
-      cmd_class={'build_py': build_py}
+      cmd_class={'build_py': build_py},
+      data_files=[('views', ['views/base.tpl', 'views/error.tpl',
+                             'views/job.tpl', 'views/list.tpl']
+                   )]
       )
